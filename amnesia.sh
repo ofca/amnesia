@@ -1,19 +1,14 @@
 #!/usr/bin/env bash
 
-# curl -s https://github.com/Dieterbe/libui-sh/blob/master/libui.sh | bash -s install ee
-# curl url -o /tmp/amnesia.sh && bash -c "/tmp/amensia.sh install"
-# ee port:usage
-# ee port ?
-# ee cfg:url bla
-# curl https://github.com/ofca/amnesia/amnesia.sh -o /usr/local/bin/ee.sh && chmod +x /usr/local/bin/ee.sh
-
 set -eo pipefail
 
+# URL to repository with scripts.
 URL=""
+# Path to directory with amnesia data.
+CFG_DIR="$HOME/.config/amnesia"
 
 [[ "$AMNESIA_LOCAL" == "1" ]] && LOCAL="1" || LOCAL="0"
 
-CFG_DIR="$HOME/.config/amnesia"
 mkdir -p "$CFG_DIR"
 
 DIM='\033[0;37m'
@@ -32,26 +27,48 @@ if [[ "$LOCAL" == "1" ]]; then
   URL="./repo"
 else
   if [ -z "$URL" ]; then
+    # Ask for repository url if not defined.
     if [ ! -f "$CFG_DIR/url" ]; then
-      echo -ne "Provide repository URL\n$BLU:$NC "
-      read user_input
-      if ! [[ "$user_input" =~ ^http ]]; then
-        user_input="https://github.com/$user_input"
-        fi
-      echo "$user_input" > "$CFG_DIR/url"
+      ask_for_url
     fi
 
     URL=$(cat "$CFG_DIR/url")
   fi
 fi
 
+# Ask for URL and save it to file.
+#
+# @return void
+function ask_for_url() {
+  local url=""
+  if [ -f "$CFG_URL/url" ]; then
+    url=$(cat "$CFG_URL/url")
+    fi
+
+  echo -e "Current URL: $url"
+  echo -ne "Provide repository URL\n$BLU:$NC "
+  read user_input
+  if [[ -n "$user_input" ]]; then
+    if ! [[ "$user_input" =~ ^http ]]; then
+      user_input="https://github.com/$user_input"
+      fi
+    echo "$user_input" > "$CFG_DIR/url"
+    echo -e "${GRN}URL set.$NC"
+    rm -f "$CFG_DIR/index"
+    fi;
+}
+
+# Fetch file from repository url.
+#
+# @param string Path to the file.
+# @return string File content.
 function fetch() {
   local path=$1
 
   if [ "$LOCAL" == "1" ]; then
     cat "$URL/$path"
   else
-    curl -o - "$URL/$path"
+    curl -s -o - "$URL/$path"
     fi
 }
 
@@ -79,8 +96,8 @@ function print_scripts_list() {
         echo -e "\n$GRN# ${group^}.$NC"
         fi
       echo -e "$(build_entry "$line" "$index" "$group")"
-      index=$((index+1))
       fi
+    index=$((index+1))
   done < "$(get_index_file)"
 }
 
@@ -303,9 +320,14 @@ function get_description_from_index_entry() {
   echo -n "$entry" | grep -oP "(?<=description:)[^|]+" | xargs | tr -d '\n'
 }
 
+# Return path to index file (if index file does not exists it is downloaded first).
+#
+# @return string Absolute path to index file.
 function get_index_file() {
   if [[ ! -f "$CFG_DIR/index" ]]; then
     fetch "index" > "$CFG_DIR/index"
+    # Empty line on the end of the file is needed for proper parsing.
+    echo -e "" >> "$CFG_DIR/index"
     fi
 
   echo "$CFG_DIR/index"
@@ -344,8 +366,12 @@ function repeat() {
 action=$1
 
 if [[ "$action" == ":refresh" ]]; then
-  rm "$CFG_DIR/index"
+  rm -f "$CFG_DIR/index"
   echo -e "${GRN}Index refreshed.$NC"
+  exit 0
+  fi
+if [[ "$action" == ":url" ]]; then
+  ask_for_url
   exit 0
   fi
 
