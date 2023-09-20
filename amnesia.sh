@@ -375,6 +375,8 @@ if [[ "$action" == ":url" ]]; then
   exit 0
   fi
 
+# @action
+# Try to execute script: amnesia group:script
 script_name="$(get_script_file_name "$action")"
 if [ -n "$script_name" ]; then
   execute_script "$script_name" "${@:2}"
